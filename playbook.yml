@@ -1,0 +1,195 @@
+---
+# docker containers:
+# x server
+# x math
+# x postgres
+# x file-server
+# x client-participation
+# x client-admin
+# x client-report
+
+# docker volumes
+# x postgres data
+
+- name: polis deploy
+  hosts: west
+  remote_user: hank
+  vars:
+    user: hank
+    branch: playbook
+    homedir: "/home/{{ user }}"
+    org: "ballPointPenguin" # change to pol-is
+    workdir: "{{ homedir }}/code/src/github.com/{{ org }}/polisServer"
+
+  tasks:
+    - name: ensure workdir parent dir is present
+      file:
+        path: "{{ homedir }}/code/src/github.com/{{ org }}"
+        state: directory
+
+    - name: clone or update polisServer repository
+      git:
+        accept_hostkey: yes
+        dest: "{{ workdir }}"
+        key_file: "{{ homedir }}/.ssh/id_rsa"
+        repo: "git@github.com:{{ org }}/polisServer.git"
+        update: yes
+        version: "{{ branch }}"
+
+    - name: register the current git hash
+      command: git rev-parse --short HEAD
+      register: git_hash
+      args:
+        chdir: "{{ workdir }}"
+
+    - name: copy .env file to remote folder
+      copy:
+        src: .env
+        dest: "{{ workdir }}/.env"
+
+    # DATABASE
+
+    - name: ensure postgres data volume
+      docker_container:
+        image: postgres:9.5
+        name: polis-db-data
+        state: stopped
+
+    - name: build polis postgres image
+      docker_image:
+        name: polisdemo/postgres
+        source: build
+        tag: demo
+        build:
+          dockerfile: Dockerfile-db
+          path: "{{ workdir }}/server"
+          pull: no
+
+    - name: run polis postgres
+      docker_container:
+        image: polisdemo/postgres:demo
+        name: polis-postgres
+        restart_policy: always
+        env_file: "{{ workdir }}/.env"
+        volumes_from:
+          - polis-db-data
+
+    # CLIENT COMPONENTS
+
+    - name: build client-admin image
+      docker_image:
+        # force_source: yes
+        name: polisdemo/client-admin
+        source: build
+        tag: demo
+        build:
+          path: "{{ workdir }}/client-admin"
+          pull: no
+          args:
+            GIT_HASH: "{{ git_hash }}"
+          cache_from:
+            - node:6.10.3-alpine
+            - polisdemo/client-admin:demo
+
+    - name: build client-participation image
+      docker_image:
+        # force_source: yes
+        name: polisdemo/client-participation
+        source: build
+        tag: demo
+        build:
+          path: "{{ workdir }}/client-participation"
+          pull: no
+          args:
+            GIT_HASH: "{{ git_hash }}"
+
+    - name: build client-report image
+      docker_image:
+        # force_source: yes
+        name: polisdemo/client-report
+        source: build
+        tag: demo
+        build:
+          path: "{{ workdir }}/client-report"
+          pull: no
+          args:
+            GIT_HASH: "{{ git_hash }}"
+
+    # FILE SERVER
+    # Depends On:
+    # - polisdemo/client-admin
+    # - polisdemo/client-participation
+    # - polisdemo/client-report
+    - name: build file-server image
+      docker_image:
+        force_source: yes # keep this yes
+        name: polisdemo/file-server
+        source: build
+        tag: demo
+        build:
+          path: "{{ workdir }}/file-server"
+          pull: no
+
+    - name: run file-server
+      docker_container:
+        image: polisdemo/file-server:demo
+        name: polis-file-server
+        # recreate: yes
+        restart_policy: always
+
+    # API SERVER
+    # depends_on:
+    # - postgres
+    # - file-server
+    - name: build polis api server image
+      docker_image:
+        # force_source: yes
+        name: polisdemo/server
+        source: build
+        tag: demo
+        build:
+          path: "{{ workdir }}/server"
+          pull: no
+
+    - name: run polis api server
+      docker_container:
+        env_file: "{{ workdir }}/.env"
+        image: polisdemo/server:demo
+        name: polis-server
+        # recreate: yes
+        restart_policy: always
+        env:
+          PORT: "5000"
+          HSTS: "off"
+          LETSENCRYPT_HOST: "polisdemo.tech,www.polisdemo.tech"
+          VIRTUAL_HOST: "polisdemo.tech,www.polisdemo.tech"
+          VIRTUAL_PORT: "5000"
+        links:
+          - "polis-file-server:file-server"
+          - "polis-postgres:postgres"
+
+    # MATH
+    # depends_on:
+    # - postgres
+    - name: build polis math image
+      docker_image:
+        # force_source: yes
+        name: polisdemo/math
+        source: build
+        tag: demo
+        build:
+          path: "{{ workdir }}/math"
+          pull: no
+
+    - name: run polis math
+      docker_container:
+        env_file: "{{ workdir }}/.env"
+        image: polisdemo/math:demo
+        name: polis-math
+        restart_policy: always
+        env:
+          SERVER_PORT: "3123"
+        exposed_ports:
+          - "3123"
+        links:
+          - "polis-postgres:postgres"
