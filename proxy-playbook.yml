@@ -1,0 +1,75 @@
+---
+- name: nginx-proxy and letsencrypt deploy
+  gather_facts: False
+  hosts: webservers
+  vars_files:
+    - vars.yml
+
+  tasks:
+    # NGINX REVERSE PROXY
+    - name: ensure /usr/local/etc/nginx directory is present
+      file:
+        path: /usr/local/etc/nginx
+        state: directory
+
+    - name: copy custom_proxy_settings file
+      copy:
+        src: custom_proxy_settings.conf
+        dest: /usr/local/etc/nginx/
+
+    - name: Run public-facing nginx-proxy container
+      docker_container:
+        image: nginx:latest
+        name: nginx-proxy
+        pull: true
+        restart_policy: always
+        env:
+          RESOLVERS: "8.8.8.8 8.8.4.4"
+        ports:
+          - "80:80"
+          - "443:443"
+        volumes:
+          - /usr/local/etc/nginx/custom_proxy_settings.conf:/etc/nginx/conf.d/custom_proxy_settings.conf
+          - /etc/nginx/certs
+          - /etc/nginx/conf.d
+          - /etc/nginx/vhost.d
+          - /usr/share/nginx/html
+
+    # DOCKER GEN
+    - name: copy nginx.tmpl file
+      copy:
+        src: nginx.tmpl
+        dest: /usr/local/etc/nginx/nginx.tmpl
+
+    - name: pull and run docker-gen container
+      docker_container:
+        image: jwilder/docker-gen:latest
+        name: nginx-proxy-gen
+        pull: true
+        restart_policy: always
+        volumes:
+          - /usr/local/etc/nginx/nginx.tmpl:/etc/docker-gen/templates/nginx.tmpl:ro
+          - /var/run/docker.sock:/tmp/docker.sock:ro
+        volumes_from:
+          - nginx-proxy
+        entrypoint: "/usr/local/bin/docker-gen -notify-sighup nginx-proxy -watch
+          -wait 5s:30s /etc/docker-gen/templates/nginx.tmpl
+          /etc/nginx/conf.d/default.conf"
+
+    # LETSENCRYPT PROXY COMPANION
+    - name: Run nginx-proxy letsencrypt companion
+      docker_container:
+        image: jrcs/letsencrypt-nginx-proxy-companion:latest
+        name: nginx-proxy-letsencrypt
+        pull: true
+        restart_policy: always
+        env:
+          # uncomment to use letsencrypt staging service (dry-run):
+          # ACME_CA_URI: "https://acme-staging-v02.api.letsencrypt.org/directory"
+          DEBUG: false
+          DEFAULT_EMAIL: "{{ admin_email }}"
+          NGINX_DOCKER_GEN_CONTAINER: "nginx-proxy-gen"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock:ro
+        volumes_from:
+          - nginx-proxy
