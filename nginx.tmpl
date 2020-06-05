@@ -1,7 +1,10 @@
-# https://raw.githubusercontent.com/jwilder/nginx-proxy/master/nginx.tmpl
-# updated 26 Sep 2019
+# curl https://raw.githubusercontent.com/nginx-proxy/nginx-proxy/master/nginx.tmpl
+# last downloaded on 05-Jun-2020
 
 {{ $CurrentContainer := where $ "ID" .Docker.CurrentContainerID | first }}
+
+{{ $external_http_port := coalesce $.Env.HTTP_PORT "80" }}
+{{ $external_https_port := coalesce $.Env.HTTPS_PORT "443" }}
 
 {{ define "upstream" }}
 	{{ if .Address }}
@@ -138,25 +141,27 @@ proxy_set_header X-Forwarded-Port $proxy_x_forwarded_port;
 proxy_set_header Proxy "";
 {{ end }}
 
+{{ $access_log := (or (and (not $.Env.DISABLE_ACCESS_LOGS) "access_log /var/log/nginx/access.log vhost;") "") }}
+
 {{ $enable_ipv6 := eq (or ($.Env.ENABLE_IPV6) "") "true" }}
 server {
 	server_name _; # This is just an invalid value which will never trigger on a real hostname.
-	listen 80;
+	listen {{ $external_http_port }};
 	{{ if $enable_ipv6 }}
-	listen [::]:80;
+	listen [::]:{{ $external_http_port }};
 	{{ end }}
-	access_log /var/log/nginx/access.log vhost;
+	{{ $access_log }}
 	return 503;
 }
 
 {{ if (and (exists "/etc/nginx/certs/default.crt") (exists "/etc/nginx/certs/default.key")) }}
 server {
 	server_name _; # This is just an invalid value which will never trigger on a real hostname.
-	listen 443 ssl http2;
+	listen {{ $external_https_port }} ssl http2;
 	{{ if $enable_ipv6 }}
-	listen [::]:443 ssl http2;
+	listen [::]:{{ $external_https_port }} ssl http2;
 	{{ end }}
-	access_log /var/log/nginx/access.log vhost;
+	{{ $access_log }}
 	return 503;
 
 	ssl_session_cache shared:SSL:50m;
@@ -244,33 +249,34 @@ upstream {{ $upstream_name }} {
 {{ if eq $https_method "redirect" }}
 server {
 	server_name {{ $host }};
-	listen 80 {{ $default_server }};
+	listen {{ $external_http_port }} {{ $default_server }};
 	{{ if $enable_ipv6 }}
-	listen [::]:80 {{ $default_server }};
+	listen [::]:{{ $external_http_port }} {{ $default_server }};
 	{{ end }}
-	access_log /var/log/nginx/access.log vhost;
-
+	{{ $access_log }}
+	
+	# Do not HTTPS redirect Let'sEncrypt ACME challenge
 	location /.well-known/acme-challenge/ {
-			auth_basic off;
-			allow all;
-			root /usr/share/nginx/html;
-			try_files $uri =404;
-			break;
+		auth_basic off;
+		allow all;
+		root /usr/share/nginx/html;
+		try_files $uri =404;
+		break;
 	}
-
+	
 	location / {
-					return 301 https://$host$request_uri;
+		return 301 https://$host$request_uri;
 	}
 }
 {{ end }}
 
 server {
 	server_name {{ $host }};
-	listen 443 ssl http2 {{ $default_server }};
+	listen {{ $external_https_port }} ssl http2 {{ $default_server }};
 	{{ if $enable_ipv6 }}
-	listen [::]:443 ssl http2 {{ $default_server }};
+	listen [::]:{{ $external_https_port }} ssl http2 {{ $default_server }};
 	{{ end }}
-	access_log /var/log/nginx/access.log vhost;
+	{{ $access_log }}
 
 	{{ if eq $network_tag "internal" }}
 	# Only allow traffic from internal clients
@@ -314,6 +320,8 @@ server {
 		root   {{ trim $vhost_root }};
 		include fastcgi_params;
 		fastcgi_pass {{ trim $upstream_name }};
+		{{ else if eq $proto "grpc" }}
+		grpc_pass {{ trim $proto }}://{{ trim $upstream_name }};
 		{{ else }}
 		proxy_pass {{ trim $proto }}://{{ trim $upstream_name }};
 		{{ end }}
@@ -336,11 +344,11 @@ server {
 
 server {
 	server_name {{ $host }};
-	listen 80 {{ $default_server }};
+	listen {{ $external_http_port }} {{ $default_server }};
 	{{ if $enable_ipv6 }}
 	listen [::]:80 {{ $default_server }};
 	{{ end }}
-	access_log /var/log/nginx/access.log vhost;
+	{{ $access_log }}
 
 	{{ if eq $network_tag "internal" }}
 	# Only allow traffic from internal clients
@@ -361,6 +369,8 @@ server {
 		root   {{ trim $vhost_root }};
 		include fastcgi_params;
 		fastcgi_pass {{ trim $upstream_name }};
+		{{ else if eq $proto "grpc" }}
+		grpc_pass {{ trim $proto }}://{{ trim $upstream_name }};
 		{{ else }}
 		proxy_pass {{ trim $proto }}://{{ trim $upstream_name }};
 		{{ end }}
@@ -379,11 +389,11 @@ server {
 {{ if (and (not $is_https) (exists "/etc/nginx/certs/default.crt") (exists "/etc/nginx/certs/default.key")) }}
 server {
 	server_name {{ $host }};
-	listen 443 ssl http2 {{ $default_server }};
+	listen {{ $external_https_port }} ssl http2 {{ $default_server }};
 	{{ if $enable_ipv6 }}
-	listen [::]:443 ssl http2 {{ $default_server }};
+	listen [::]:{{ $external_https_port }} ssl http2 {{ $default_server }};
 	{{ end }}
-	access_log /var/log/nginx/access.log vhost;
+	{{ $access_log }}
 	return 500;
 
 	ssl_certificate /etc/nginx/certs/default.crt;
