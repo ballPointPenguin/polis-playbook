@@ -85,6 +85,8 @@ https://github.com/pol-is/polisServer.
       - https://docs.ansible.com/ansible/latest/network/getting_started/first_inventory.html
       - https://docs.ansible.com/ansible/latest/user_guide/become.html
 11. edit vars.yml:
+    - change the hosts to your domain, or domains, which can include sub-
+      domains and www, e.g. "mypolis.net,www.mypolis.net"
     - change the admin_email to an email address you don't mind being
       associated with your letsencrypt certificates, if using.
     - change org and branch to match the github repo you are using for polis
