@@ -1,4 +1,4 @@
-### What is this?
+## What is this?
 
 This is an ansible playbook for deploying instances of polis. I hope to make it
 flexible enough to accomodate various environments. This should be treated as
@@ -30,6 +30,15 @@ the outside world, with letsencrypt certification. If you are hosting multiple
 web services on the same machine, then this is the way to go. There's nothing
 stopping you from hosting a swarm of polises (a "skulk of poleis"?), with
 various domains or subdomains, from a single server. I plan to.
+
+### Is this ready to use?
+
+NO! The upstream polisServer project is under active and rapid development. One
+blocker is the degree to which the https://pol.is domain is hard-coded in the
+source code. In its current state, this project will not fully function due
+to some of these issues. Progress is being made every day and I hope to remove
+this warning soon. You can get involved or monitor this progress at
+https://github.com/pol-is/polisServer.
 
 ## Setup and Configuration
 
