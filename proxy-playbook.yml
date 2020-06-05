@@ -66,7 +66,7 @@
         env:
           # uncomment to use letsencrypt staging service (dry-run):
           # ACME_CA_URI: "https://acme-staging-v02.api.letsencrypt.org/directory"
-          DEBUG: false
+          DEBUG: "false" # set to "true" for verbose output
           DEFAULT_EMAIL: "{{ admin_email }}"
           NGINX_DOCKER_GEN_CONTAINER: "nginx-proxy-gen"
         volumes:
