@@ -81,9 +81,6 @@
           pull: no
           args:
             GIT_HASH: "{{ git_hash }}"
-          cache_from:
-            - node:6.10.3-alpine
-            - "polisdemo/client-admin:{{ buildtag }}"
 
     - name: build client-participation image
       docker_image:
