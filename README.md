@@ -42,6 +42,8 @@ https://github.com/pol-is/polisServer.
 
 ## Setup and Configuration
 
+### prerequisites
+
 1. ensure that your target server has python installed. I think python3 is
   required by ansible these days.
 2. ensure that your target server has git installed on it and can access
@@ -50,13 +52,25 @@ https://github.com/pol-is/polisServer.
 4. ensure that your server has docker installed, the docker daemon running, and
   that your user is a member of the 'docker' group
 5. ensure that your domain dns is pointing to your server's IP address
-6. ensure you have ansible installed on your development machine (person laptop
-  or whatever)
+6. ensure you have ansible installed on your development machine (personal
+   laptop or whatever)
+
+    _note: I do have an ansible playbook that does most of these things on my
+   server, but it is specific to Arch linux, and makes other assumptions. If I
+   can make it more general I might include that in future versions of this
+   project._
+
+   _See https://github.com/aliencyborg/ansible-server_
+
+### clone this repo
+
 7. clone this repo on your development machine (personal laptop or whatever)
 
    `git clone git@github.com:ballPointPenguin/polis-playbook.git`
 
    `cd polis-playbook`
+
+### configuration files
 
 8. copy the example files:
 
