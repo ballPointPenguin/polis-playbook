@@ -12,27 +12,21 @@
 # x postgres data
 
 - name: polis deploy
-  hosts: west
-  remote_user: hank
-  vars:
-    user: hank
-    branch: playbook
-    homedir: "/home/{{ user }}"
-    org: "ballPointPenguin" # change to pol-is
-    workdir: "{{ homedir }}/code/src/github.com/{{ org }}/polisServer"
+  gather_facts: False
+  hosts: webservers
+  vars_files:
+    - vars.yml
 
   tasks:
-    - name: ensure workdir parent dir is present
+    - name: ensure workdir is present
       file:
-        path: "{{ homedir }}/code/src/github.com/{{ org }}"
+        path: "{{ workdir }}"
         state: directory
 
     - name: clone or update polisServer repository
       git:
-        accept_hostkey: yes
         dest: "{{ workdir }}"
-        key_file: "{{ homedir }}/.ssh/id_rsa"
-        repo: "git@github.com:{{ org }}/polisServer.git"
+        repo: "https://github.com/{{ org }}/polisServer.git"
         update: yes
         version: "{{ branch }}"
 
@@ -59,7 +53,7 @@
       docker_image:
         name: polisdemo/postgres
         source: build
-        tag: demo
+        tag: "{{ buildtag }}"
         build:
           dockerfile: Dockerfile-db
           path: "{{ workdir }}/server"
@@ -67,7 +61,7 @@
 
     - name: run polis postgres
       docker_container:
-        image: polisdemo/postgres:demo
+        image: "polisdemo/postgres:{{ buildtag }}"
         name: polis-postgres
         restart_policy: always
         env_file: "{{ workdir }}/.env"
@@ -81,7 +75,7 @@
         # force_source: yes
         name: polisdemo/client-admin
         source: build
-        tag: demo
+        tag: "{{ buildtag }}"
         build:
           path: "{{ workdir }}/client-admin"
           pull: no
@@ -89,14 +83,14 @@
             GIT_HASH: "{{ git_hash }}"
           cache_from:
             - node:6.10.3-alpine
-            - polisdemo/client-admin:demo
+            - "polisdemo/client-admin:{{ buildtag }}"
 
     - name: build client-participation image
       docker_image:
         # force_source: yes
         name: polisdemo/client-participation
         source: build
-        tag: demo
+        tag: "{{ buildtag }}"
         build:
           path: "{{ workdir }}/client-participation"
           pull: no
@@ -108,7 +102,7 @@
         # force_source: yes
         name: polisdemo/client-report
         source: build
-        tag: demo
+        tag: "{{ buildtag }}"
         build:
           path: "{{ workdir }}/client-report"
           pull: no
@@ -125,14 +119,16 @@
         force_source: yes # keep this yes
         name: polisdemo/file-server
         source: build
-        tag: demo
+        tag: "{{ buildtag }}"
         build:
           path: "{{ workdir }}/file-server"
           pull: no
+          args:
+            TAG: "{{ buildtag }}"
 
     - name: run file-server
       docker_container:
-        image: polisdemo/file-server:demo
+        image: "polisdemo/file-server:{{ buildtag }}"
         name: polis-file-server
         # recreate: yes
         restart_policy: always
@@ -146,7 +142,7 @@
         # force_source: yes
         name: polisdemo/server
         source: build
-        tag: demo
+        tag: "{{ buildtag }}"
         build:
           path: "{{ workdir }}/server"
           pull: no
@@ -154,7 +150,7 @@
     - name: run polis api server
       docker_container:
         env_file: "{{ workdir }}/.env"
-        image: polisdemo/server:demo
+        image: "polisdemo/server:{{ buildtag }}"
         name: polis-server
         # recreate: yes
         restart_policy: always
@@ -176,7 +172,7 @@
         # force_source: yes
         name: polisdemo/math
         source: build
-        tag: demo
+        tag: "{{ buildtag }}"
         build:
           path: "{{ workdir }}/math"
           pull: no
@@ -184,7 +180,7 @@
     - name: run polis math
       docker_container:
         env_file: "{{ workdir }}/.env"
-        image: polisdemo/math:demo
+        image: "polisdemo/math:{{ buildtag }}"
         name: polis-math
         restart_policy: always
         env:
