@@ -2,5 +2,6 @@
 admin_email: "admin@example.com" # your email, used for letsencrypt cert
 branch: dev # branch to clone and build from
 buildtag: dev # built docker images will get this tag
+hosts: "polisdemo.tech,www.polisdemo.tech" # domain and/or subdomains to host this instance on
 org: "pol-is" # github user/org to pull from
 workdir: "/root/code/polisServer" # where to clone the repo
