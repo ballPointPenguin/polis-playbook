@@ -126,13 +126,18 @@ Issues, PRs, suggestions are all welcome. I want to get this into a state that
 accomodates a variety of real world use cases.
 
 If running `ansible-playbook proxy-playbook.yml` fails with something like the following:
-  
-`"Failed to import the required Python library (Docker SDK for Python: docker (Python >= 2.7) or docker-py (Python 2.6))`
+ 
+```
+"Failed to import the required Python library (Docker SDK for Python: docker (Python >= 2.7) or docker-py (Python 2.6))
+```
 
 you may need to install the `docker-py` library for `python3` on your target machine:
 
-`apt install python3-pip
-pip3 install docker-py`
+```
+apt install python3-pip
+pip3 install docker-py
+```
+
 
 for additional debugging try
 
